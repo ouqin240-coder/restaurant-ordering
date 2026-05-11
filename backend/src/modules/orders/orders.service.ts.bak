@@ -1,0 +1,297 @@
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, DataSource } from 'typeorm';
+import { IsNumber, IsOptional, IsString, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { Order, OrderStatus, OrderType, PayStatus } from '../../entities/order.entity';
+import { Dish, DishStatus } from '../../entities/dish.entity';
+import { DiningTable } from '../../entities/table.entity';
+
+export class OrderItemDto {
+  @IsNumber() dishId: number;
+  @IsOptional() @IsNumber() specId?: number;
+  @IsNumber() quantity: number;
+  @IsOptional() @IsString() remark?: string;
+}
+
+export class CreateOrderDto {
+  @IsNumber() orderType: OrderType; // 1=堂食 2=外卖
+  @IsOptional() @IsNumber() tableId?: number;
+  @IsOptional() @IsNumber() addressId?: number;
+  @IsArray() @ValidateNested({ each: true }) @Type(() => OrderItemDto)
+  items: OrderItemDto[];
+  @IsOptional() @IsString() remark?: string;
+  @IsOptional() @IsNumber() couponId?: number;
+}
+
+@Injectable()
+export class OrdersService {
+  constructor(
+    @InjectRepository(Order) private orderRepo: Repository<Order>,
+    @InjectRepository(Dish) private dishRepo: Repository<Dish>,
+    @InjectRepository(DiningTable) private tableRepo: Repository<DiningTable>,
+    private dataSource: DataSource,
+  ) {}
+
+  /** 生成订单号：时间戳+随机4位 */
+  private genOrderNo(): string {
+    const ts = Date.now().toString();
+    const rand = Math.floor(Math.random() * 9000 + 1000);
+    return `${ts}${rand}`;
+  }
+
+  /** 创建订单（事务） */
+  async createOrder(userId: number, dto: CreateOrderDto) {
+    return this.dataSource.transaction(async (manager) => {
+      // 1. 校验菜品并计算金额
+      let totalAmount = 0;
+      const orderItems: any[] = [];
+
+      for (const item of dto.items) {
+        const dish = await manager.findOne(Dish, {
+          where: { id: item.dishId },
+          relations: ['specs'],
+        });
+        if (!dish) throw new BadRequestException(`菜品 ${item.dishId} 不存在`);
+        if (dish.status === DishStatus.OFFLINE) {
+          throw new BadRequestException(`菜品「${dish.name}」已下架`);
+        }
+        if (dish.status === DishStatus.SOLD_OUT) {
+          throw new BadRequestException(`菜品「${dish.name}」已售罄`);
+        }
+
+        let unitPrice = Number(dish.price);
+        let specName: string | null = null;
+
+        if (item.specId && dish.specs?.length) {
+          const spec = dish.specs.find((s) => s.id === item.specId);
+          if (spec) {
+            unitPrice += Number(spec.priceDelta);
+            specName = spec.name;
+          }
+        }
+
+        totalAmount += unitPrice * item.quantity;
+        orderItems.push({
+          dishId: dish.id,
+          dishName: dish.name,
+          dishImage: dish.imageUrl,
+          specName,
+          price: unitPrice,
+          quantity: item.quantity,
+          remark: item.remark,
+        });
+      }
+
+      // 2. 计算配送费（外卖）
+      let deliveryFee = 0;
+      if (dto.orderType === OrderType.DELIVERY) {
+        deliveryFee = 3; // 固定配送费，实际应读配置
+      }
+
+      // 3. 查桌台快照
+      let tableNo: string | null = null;
+      if (dto.tableId) {
+        const table = await manager.findOne(DiningTable, { where: { id: dto.tableId } });
+        if (table) tableNo = table.tableNo;
+      }
+
+      // 4. 创建订单
+      const payAmount = totalAmount - 0 + deliveryFee; // 暂不支持优惠券
+      const order = manager.create(Order, {
+        orderNo: this.genOrderNo(),
+        userId,
+        orderType: dto.orderType,
+        tableId: dto.tableId,
+        tableNo,
+        addressId: dto.addressId,
+        status: OrderStatus.PENDING_PAYMENT,
+        totalAmount,
+        discountAmount: 0,
+        deliveryFee,
+        payAmount,
+        payStatus: PayStatus.UNPAID,
+        remark: dto.remark,
+        items: orderItems,
+      });
+
+      const saved = await manager.save(Order, order);
+
+      // 开发模式：自动模拟支付成功（生产环境会通过微信支付回调来更新）
+      if (process.env.NODE_ENV !== 'production') {
+        await manager.update(Order, saved.id, {
+          status: OrderStatus.PENDING_ACCEPT,
+          payStatus: PayStatus.PAID,
+          paidAt: new Date(),
+        });
+        saved.status = OrderStatus.PENDING_ACCEPT;
+        saved.payStatus = PayStatus.PAID;
+      }
+
+      // 5. 返回订单信息和微信支付参数（实际需调微信统一下单）
+      const wxPayParams = await this.buildWxPayParams(saved.orderNo, payAmount, userId);
+
+      return {
+        orderId: saved.id,
+        orderNo: saved.orderNo,
+        payAmount: saved.payAmount,
+        wxPayParams,
+      };
+    });
+  }
+
+  /** 构建微信支付参数（实际集成时替换为真实签名逻辑） */
+  private async buildWxPayParams(orderNo: string, amount: number, userId: number) {
+    // TODO: 调用微信支付统一下单 API，获取 prepay_id
+    // 这里返回 mock 数据用于开发调试
+    return {
+      timeStamp: Math.floor(Date.now() / 1000).toString(),
+      nonceStr: Math.random().toString(36).substr(2, 15),
+      package: `prepay_id=mock_${orderNo}`,
+      signType: 'RSA',
+      paySign: 'mock_sign',
+      // 实际: 使用微信支付私钥对 timeStamp+nonceStr+package 进行 RSA-SHA256 签名
+    };
+  }
+
+  /** 微信支付成功回调处理 */
+  async handlePaymentNotify(wxTransactionId: string, orderNo: string) {
+    const order = await this.orderRepo.findOne({ where: { orderNo } });
+    if (!order) throw new NotFoundException('订单不存在');
+    if (order.payStatus === PayStatus.PAID) return { already: true }; // 幂等
+
+    await this.orderRepo.update(order.id, {
+      payStatus: PayStatus.PAID,
+      status: OrderStatus.PENDING_ACCEPT,
+      wxTransactionId,
+      paidAt: new Date(),
+    });
+
+    // 返回更新后的订单（供 Gateway 推送）
+    return this.orderRepo.findOne({ where: { id: order.id } });
+  }
+
+  /** 顾客查询订单详情 */
+  async getOrderByNo(orderNo: string, userId: number) {
+    const order = await this.orderRepo.findOne({
+      where: { orderNo, userId },
+    });
+    if (!order) throw new NotFoundException('订单不存在');
+    return this.formatOrderForCustomer(order);
+  }
+
+  /** 顾客历史订单 */
+  async getUserOrders(userId: number, page = 1, pageSize = 10) {
+    const [list, total] = await this.orderRepo.findAndCount({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    });
+    return { total, list: list.map((o) => this.formatOrderForCustomer(o)) };
+  }
+
+  /** 商家获取订单列表 */
+  async getMerchantOrders(opts: {
+    status?: OrderStatus;
+    orderType?: OrderType;
+    date?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const { status, orderType, date, page = 1, pageSize = 20 } = opts;
+    const qb = this.orderRepo
+      .createQueryBuilder('o')
+      .where('o.payStatus = :paid', { paid: PayStatus.PAID })
+      .orderBy('o.createdAt', 'DESC')
+      .skip((page - 1) * pageSize)
+      .take(pageSize);
+
+    if (status !== undefined) qb.andWhere('o.status = :status', { status });
+    if (orderType !== undefined) qb.andWhere('o.orderType = :orderType', { orderType });
+    if (date) {
+      qb.andWhere('DATE(o.createdAt) = :date', { date });
+    }
+
+    const [list, total] = await qb.getManyAndCount();
+    return { total, list };
+  }
+
+  /** 商家接单 */
+  async acceptOrder(orderId: number, estimatedMinutes = 20) {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('订单不存在');
+    if (order.status !== OrderStatus.PENDING_ACCEPT) {
+      throw new BadRequestException('订单状态不允许接单');
+    }
+    await this.orderRepo.update(orderId, {
+      status: OrderStatus.PREPARING,
+      estimatedMinutes,
+      acceptedAt: new Date(),
+    });
+    return this.orderRepo.findOne({ where: { id: orderId } });
+  }
+
+  /** 商家拒单 */
+  async rejectOrder(orderId: number, reason: string) {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('订单不存在');
+    if (order.status !== OrderStatus.PENDING_ACCEPT) {
+      throw new BadRequestException('订单状态不允许拒单');
+    }
+    await this.orderRepo.update(orderId, {
+      status: OrderStatus.CANCELLED,
+      rejectReason: reason,
+    });
+    // TODO: 触发退款
+    return { success: true, refundTriggered: true };
+  }
+
+  /** 商家更新订单状态（制作完成→ready，配送完成→completed） */
+  async updateOrderStatus(orderId: number, status: OrderStatus) {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('订单不存在');
+
+    const updates: Partial<Order> = { status };
+    if (status === OrderStatus.COMPLETED) updates.finishedAt = new Date();
+
+    await this.orderRepo.update(orderId, updates);
+    return this.orderRepo.findOne({ where: { id: orderId } });
+  }
+
+  /** 今日统计 */
+  async getTodayStats() {
+    const today = new Date().toISOString().split('T')[0];
+    const result = await this.orderRepo
+      .createQueryBuilder('o')
+      .select('COUNT(*)', 'orderCount')
+      .addSelect('SUM(o.payAmount)', 'revenue')
+      .addSelect('AVG(o.payAmount)', 'avgAmount')
+      .where('DATE(o.createdAt) = :today', { today })
+      .andWhere('o.payStatus = :paid', { paid: PayStatus.PAID })
+      .andWhere('o.status != :cancelled', { cancelled: OrderStatus.CANCELLED })
+      .getRawOne();
+    return {
+      date: today,
+      orderCount: parseInt(result.orderCount) || 0,
+      revenue: parseFloat(result.revenue) || 0,
+      avgAmount: parseFloat(result.avgAmount) || 0,
+    };
+  }
+
+  private formatOrderForCustomer(order: Order) {
+    const statusTextMap = {
+      [OrderStatus.PENDING_PAYMENT]: '待付款',
+      [OrderStatus.PENDING_ACCEPT]: '待商家确认',
+      [OrderStatus.PREPARING]: '制作中',
+      [OrderStatus.READY]: order.orderType === OrderType.DELIVERY ? '配送中' : '待取餐',
+      [OrderStatus.COMPLETED]: '已完成',
+      [OrderStatus.CANCELLED]: '已取消',
+    };
+    return {
+      ...order,
+      statusText: statusTextMap[order.status],
+      orderTypeText: order.orderType === OrderType.DINE_IN ? '堂食' : '外卖',
+    };
+  }
+}

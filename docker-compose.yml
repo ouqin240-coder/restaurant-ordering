@@ -1,0 +1,79 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: restaurant_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: restaurant_ordering
+      MYSQL_USER: restaurant
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: Asia/Shanghai
+    ports: ["3306:3306"]
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-time-zone=+08:00
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      timeout: 10s
+      retries: 10
+      interval: 5s
+
+  redis:
+    image: redis:7-alpine
+    container_name: restaurant_redis
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    ports: ["6379:6379"]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: restaurant_backend
+    restart: unless-stopped
+    ports: ["3000:3000"]
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: restaurant
+      DB_PASS: ${DB_PASS}
+      DB_NAME: restaurant_ordering
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: 24h
+      JWT_MERCHANT_EXPIRES_IN: 8h
+      WX_APPID: ${WX_APPID}
+      WX_SECRET: ${WX_SECRET}
+      TZ: Asia/Shanghai
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  customer-h5:
+    build:
+      context: ./customer-h5
+      dockerfile: Dockerfile
+    ports: ["8080:80"]
+    depends_on: [backend]
+
+  merchant-admin:
+    build:
+      context: ./merchant-admin
+      dockerfile: Dockerfile
+    ports: ["8081:80"]
+    depends_on: [backend]
+
+volumes:
+  mysql_data:
+  uploads_data:

@@ -1,0 +1,17 @@
+node_modules/
+*/node_modules/
+dist/
+*/dist/
+.env
+uploads/
+*/uploads/
+mysql_data/
+redis_data/
+uploads_data/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
