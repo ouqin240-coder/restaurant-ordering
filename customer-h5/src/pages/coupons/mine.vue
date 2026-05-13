@@ -132,7 +132,7 @@ onMounted(load);
 }
 .status-tag.usable { background: #FF6034; color: white; }
 .status-tag.used { background: #ddd; color: #666; }
-.status-tag.expired { background: #f0f0f0; color: #999; }
+.status-tag.expired { background: #333; color: #666; }
 :deep(.van-nav-bar) { background: #1a1a1a !important; }
 :deep(.van-nav-bar__title) { color: #eee !important; }
 :deep(.van-nav-bar .van-icon) { color: #eee !important; }

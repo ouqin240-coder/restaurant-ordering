@@ -22,7 +22,7 @@
     </div>
 
     <!-- 地址输入弹窗 -->
-    <van-popup v-model:show="showAddressForm" position="bottom" round :style="{ height: '60%' }">
+    <van-popup v-model:show="showAddressForm" position="bottom" round :style="{ height: '60%', background: '#1a1a1a', color: '#eee' }">
       <div class="address-form-popup">
         <div class="popup-header">
           <span>填写收货地址</span>
@@ -98,11 +98,11 @@
       </div>
 
       <!-- 我的优惠券选择弹窗 -->
-      <van-popup v-model:show="showCouponPicker" position="bottom" round style="max-height: 70vh; padding: 16px;">
+      <van-popup v-model:show="showCouponPicker" position="bottom" round style="max-height: 70vh; padding: 16px; background: #1a1a1a; color: #eee;">
         <div class="picker-header">
-          <h3 style="margin:0 0 12px 0">选择优惠券</h3>
+          <h3 style="margin:0 0 12px 0;color:#eee">选择优惠券</h3>
         </div>
-        <div v-if="loadingMyCoupons" style="text-align:center;padding:40px 0;color:#999">加载中...</div>
+        <div v-if="loadingMyCoupons" style="text-align:center;padding:40px 0;color:#666">加载中...</div>
         <div v-else-if="myCoupons.length === 0" style="text-align:center;padding:40px 0;color:#999">
           暂无可用优惠券<br/>
           <button style="margin-top:12px;padding:6px 16px;background:#FF6034;color:#fff;border:none;border-radius:16px" @click="goToCouponCenter">去领券</button>

@@ -5,7 +5,7 @@
       <div class="cart-popup">
         <div class="cart-popup-header">
           <span class="cart-popup-title">已选菜品</span>
-          <van-button size="small" plain type="danger" @click="clearCart">清空</van-button>
+          <van-button size="small" plain type="danger" style="background:transparent;border-color:#666;color:#999" @click="clearCart">清空</van-button>
         </div>
         <div class="cart-popup-list">
           <div v-for="item in cartStore.items" :key="`${item.dishId}_${item.specId}`" class="cart-popup-item">
@@ -13,6 +13,7 @@
               <span class="cart-item-name">{{ item.dishName }}</span>
               <span v-if="item.specName" class="cart-item-spec">（{{ item.specName }}）</span>
             </div>
+            <div v-if="item.remark" class="cart-item-remark">备注: {{ item.remark }}</div>
             <div class="cart-item-right">
               <span class="cart-item-price">¥{{ (item.price * item.quantity).toFixed(2) }}</span>
               <div class="cart-count-ctrl">
@@ -183,7 +184,7 @@ async function clearCart() {
   align-items: center;
   justify-content: space-between;
   padding: 16px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid #333;
 }
 
 .cart-popup-title {
@@ -202,7 +203,7 @@ async function clearCart() {
   align-items: center;
   justify-content: space-between;
   padding: 12px 0;
-  border-bottom: 1px solid #f8f8f8;
+  border-bottom: 1px solid #2a2a2a;
 }
 
 .cart-item-info {
@@ -263,7 +264,16 @@ async function clearCart() {
 }
 
 .cart-remark {
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid #333;
   padding: 4px 0;
+}
+.cart-remark :deep(.van-field) { background: #252525 !important; }
+.cart-remark :deep(.van-field__control) { color: #eee !important; }
+.cart-remark :deep(.van-field__label) { color: #999 !important; }
+.cart-item-remark {
+  font-size: 11px;
+  color: #888;
+  margin-top: 2px;
+  padding-left: 2px;
 }
 </style>

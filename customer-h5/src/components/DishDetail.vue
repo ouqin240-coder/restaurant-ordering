@@ -104,14 +104,19 @@
       :src="dish.imageUrl || ''"
       @close="showPreview = false"
     />
+    <Teleport to="body">
+      <div v-if="showPreview" class="img-preview-overlay" @click="showPreview = false">
+        < img :src="dish.imageUrl" class="img-preview-full" @click.stop />
+        <div class="img-preview-close" @click="showPreview = false">X</div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { showToast } from 'vant';
 import { useCartStore } from '@/stores/cart';
-import ImagePreview from './ImagePreview.vue';
 
 const props = defineProps<{ dish: any }>();
 const emit = defineEmits(['add', 'close']);
@@ -127,6 +132,13 @@ function previewImage() {
 
 const qty = ref(1);
 const itemRemark = ref('');
+
+// 打开新菜品时重置备注和数量
+watch(() => props.dish?.id, () => {
+  itemRemark.value = '';
+  qty.value = 1;
+  selectedSpecId.value = props.dish?.specs?.[0]?.id ?? undefined;
+});
 const selectedSpecId = ref<number | undefined>(
   props.dish.specs?.[0]?.id ?? undefined,
 );
@@ -167,7 +179,7 @@ function addToCart() {
 <style scoped>
 .dish-detail {
   position: relative;
-  background: white;
+  background: #1a1a1a;
   border-radius: 16px 16px 0 0;
   overflow: hidden;
 }
@@ -191,16 +203,17 @@ function addToCart() {
 .dish-hero {
   position: relative;
   width: 100%;
-  height: 220px;
+  max-height: 300px;
   overflow: hidden;
-  background: #f5f5f5;
+  background: #2a2a2a;
   cursor: pointer;
 }
 
 .hero-img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+  max-height: 300px;
+  object-fit: contain;
 }
 
 .hero-placeholder {
@@ -230,7 +243,7 @@ function addToCart() {
 .dish-title {
   font-size: 20px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: #eee;
   margin-bottom: 8px;
 }
 
@@ -244,22 +257,22 @@ function addToCart() {
 .tag {
   font-size: 11px;
   color: #FF6034;
-  background: #fff3ef;
-  border: 1px solid #ffd0c0;
+  background: rgba(255,87,34,0.12);
+  border: 1px solid rgba(255,87,34,0.3);
   padding: 2px 8px;
   border-radius: 4px;
 }
 
 .dish-desc {
   font-size: 14px;
-  color: #888;
+  color: #999;
   line-height: 1.6;
   margin-bottom: 8px;
 }
 
 .sales-info {
   font-size: 12px;
-  color: #bbb;
+  color: #666;
   margin-bottom: 16px;
 }
 
@@ -271,7 +284,7 @@ function addToCart() {
 .spec-title {
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: #ccc;
   margin-bottom: 10px;
 }
 
@@ -286,7 +299,7 @@ function addToCart() {
   align-items: center;
   gap: 4px;
   padding: 6px 14px;
-  border: 1.5px solid #e0e0e0;
+  border: 1.5px solid #444;
   border-radius: 20px;
   cursor: pointer;
   transition: all 0.2s;
@@ -294,7 +307,7 @@ function addToCart() {
 
 .spec-option.selected {
   border-color: #FF6034;
-  background: #fff3ef;
+  background: rgba(255,87,34,0.12);
   color: #FF6034;
 }
 
@@ -308,8 +321,15 @@ function addToCart() {
 }
 
 .remark-input {
-  border: 1px solid #eee;
+  border: 1px solid #333;
   border-radius: 8px;
+}
+.remark-input :deep(.van-field__control) { color: #eee !important; }
+.remark-section :deep(.van-field) { background: #252525 !important; }
+.remark-section :deep(.van-cell) { background: transparent !important; }
+.remark-input-hack {
+  background: #252525 !important;
+  color: #eee;
 }
 
 .bottom-action {
@@ -318,7 +338,7 @@ function addToCart() {
   gap: 12px;
   margin-top: 24px;
   padding-top: 16px;
-  border-top: 1px solid #f5f5f5;
+  border-top: 1px solid #333;
 }
 
 .qty-control {
@@ -335,6 +355,7 @@ function addToCart() {
 .qty-num {
   font-size: 18px;
   font-weight: 700;
+  color: #eee;
   min-width: 24px;
   text-align: center;
 }
@@ -364,5 +385,33 @@ function addToCart() {
   height: 40px;
   font-size: 15px;
   font-weight: 600;
+}
+.img-preview-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.95);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.img-preview-full {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.img-preview-close {
+  position: fixed;
+  top: 20px; right: 20px;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  color: white;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
 </style>

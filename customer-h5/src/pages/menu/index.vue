@@ -128,7 +128,7 @@
       v-model:show="showDishDetail"
       position="bottom"
       round
-      :style="{ maxHeight: '80vh', overflow: 'auto' }"
+      :style="{ maxHeight: '80vh', overflow: 'auto', background: '#1a1a1a' }"
     >
       <dish-detail
         v-if="selectedDish"

@@ -23,6 +23,7 @@
         </span>
         <span class="item-price">¥{{ Number(item.price).toFixed(2) }}</span>
         <span class="item-qty">×{{ item.quantity }}</span>
+        <div v-if="item.remark" class="item-remark">📝 {{ item.remark }}</div>
       </div>
       <div v-if="order.remark" class="order-remark">
         <el-icon><ChatLineRound /></el-icon>
@@ -330,5 +331,12 @@ function formatTime(t: string) {
 .done-hint {
   font-size: 12px;
   color: #aaa;
+}
+.item-remark {
+  width: 100%;
+  font-size: 12px;
+  color: #999;
+  margin-top: 2px;
+  padding-left: 4px;
 }
 </style>

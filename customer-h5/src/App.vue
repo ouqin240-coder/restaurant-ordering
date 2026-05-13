@@ -103,10 +103,21 @@ body {
 .van-field__control::placeholder { color: #666 !important; }
 .van-field__label { color: #ccc !important; }
 .van-empty__description { color: #666 !important; }
+.van-popup { background: #1a1a1a !important; color: #eee !important; }
+.van-popup--bottom.van-popup--round { background: #1a1a1a !important; }
 .van-dialog { background: #1e1e1e !important; }
 .van-dialog__header { color: #eee !important; }
 .van-dialog__message { color: #ccc !important; }
 .van-dialog__confirm { color: #FF5722 !important; }
+.van-dialog__footer { background: #1e1e1e !important; }
+.van-dialog__cancel { color: #999 !important; background: #1e1e1e !important; }
+.van-dialog__content { background: #1e1e1e !important; }
+.van-dialog .van-hairline--top { background: #1e1e1e !important; }
+.van-dialog .van-button { background: #1e1e1e !important; border-color: #333 !important; }
+.van-dialog .van-button--default { color: #999 !important; }
+.van-dialog .van-button--primary { color: #FF5722 !important; }
+.van-dialog::after, .van-dialog .van-hairline--left::after { border-color: #333 !important; }
+.van-overlay { background: rgba(0,0,0,0.75) !important; }
 .van-action-sheet { background: #1e1e1e !important; }
 .van-action-sheet__header { color: #eee !important; }
 .van-action-sheet__item { background: #1e1e1e !important; color: #eee !important; }

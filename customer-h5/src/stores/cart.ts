@@ -25,9 +25,13 @@ export const useCartStore = defineStore('cart', {
 
   actions: {
     addItem(item: Omit<CartItem, 'quantity'> & { quantity?: number }) {
-      const key = `${item.dishId}_${item.specId || 0}`;
+      // 有单品备注时不合并，作为独立条目
+      if (item.remark) {
+        this.items.push({ ...item, quantity: item.quantity || 1 });
+        return;
+      }
       const existing = this.items.find(
-        (i) => i.dishId === item.dishId && i.specId === item.specId,
+        (i) => i.dishId === item.dishId && i.specId === item.specId && !i.remark,
       );
       if (existing) {
         existing.quantity += item.quantity || 1;
