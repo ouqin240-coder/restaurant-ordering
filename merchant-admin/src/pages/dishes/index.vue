@@ -66,12 +66,12 @@
         <el-table-column type="selection" width="50" />
         <el-table-column label="图片" width="70">
           <template #default="{ row }">
-            <el-image
+            <img
               v-if="row.imageUrl"
               :src="row.imageUrl"
-              :preview-src-list="[row.imageUrl]"
               fit="cover"
-              style="width:48px;height:48px;border-radius:6px"
+              style="width:48px;height:48px;border-radius:6px;object-fit:cover;cursor:pointer"
+              @click="previewUrl = row.imageUrl; showPreview = true"
             />
             <div v-else class="img-placeholder">暂无</div>
           </template>
@@ -112,13 +112,20 @@
             />
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column label="操作" width="120">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openDishForm(row)">编辑</el-button>
             <el-button link type="danger" size="small" @click="deleteDish(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
+
+      <!-- 图片预览弹窗 -->
+      <el-dialog v-model="showPreview" title="菜品图片" width="500px" append-to-body>
+        <div style="text-align:center">
+          <img :src="previewUrl" style="max-width:100%;max-height:70vh;object-fit:contain;border-radius:8px" />
+        </div>
+      </el-dialog>
     </div>
 
     <!-- 菜品表单弹窗 -->
@@ -203,6 +210,8 @@ import {
 const categories = ref<any[]>([]);
 const dishes = ref<any[]>([]);
 const loading = ref(false);
+const showPreview = ref(false);
+const previewUrl = ref('');
 const saving = ref(false);
 const activeCategoryId = ref<number | 'all'>('all');
 const searchText = ref('');

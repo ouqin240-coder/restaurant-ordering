@@ -49,4 +49,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica
 .el-tabs__item.is-active {
   color: #FF5722 !important;
 }
+
+/* 图片预览层级高于表格固定列 */
+.el-image-viewer__wrapper { z-index: 99999 !important; }
+.el-table__fixed-right { z-index: 1 !important; }
 </style>
